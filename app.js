@@ -1,12 +1,35 @@
 const express = require('express');
 const path = require('path');
+const cors = require('cors');
+const helmet = require('helmet');
+const morgan = require('morgan');
+const rateLimit = require('express-rate-limit');
 const userRoutes = require('./src/routes/userRoutes');
 const connectDB = require('./config/db');
 const { MessagingResponse } = require('twilio').twiml;
 const IncidentService = require('./src/services/incidentService');
+const { errorHandler } = require('./src/middleware/errorHandler');
 
 const app = express();
-const PORT = 2000;
+const PORT = process.env.PORT || 2000;
+
+// Security middleware
+app.use(helmet());
+app.use(cors({
+  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+  credentials: true
+}));
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: 'Too many requests from this IP, please try again later.'
+});
+app.use(limiter);
+
+// Logging middleware
+app.use(morgan('combined'));
 
 // For Twilio webhook (raw body for signature validation, before other parsers)
 app.use('/api/incidents/webhook', express.raw({ type: '*' }));
@@ -27,9 +50,10 @@ const incidentRoutes = require('./src/routes/incidentRoutes');
 app.use('/api/incidents', incidentRoutes);
 app.use(userRoutes);
 
+// Consolidated WhatsApp webhook handler
 app.post('/whatsapp', async (req, res) => {
   try {
-    console.log('WhatsApp webhook received:', JSON.stringify(req.body, null, 2)); // Log full payload for debugging
+    console.log('WhatsApp webhook received:', JSON.stringify(req.body, null, 2));
 
     const body = req.body.Body || '';
     const reporterPhone = req.body.From ? req.body.From.replace('whatsapp:', '') : null;
@@ -37,15 +61,12 @@ app.post('/whatsapp', async (req, res) => {
     const latitude = parseFloat(req.body.Latitude);
     const longitude = parseFloat(req.body.Longitude);
 
-    console.log('Parsed - Body:', body, 'Phone:', reporterPhone, 'Has Location:', hasLocation, 'Lat/Lng:', latitude, longitude);
-
     if (!reporterPhone) {
       throw new Error('Missing sender phone');
     }
 
     const incidentService = new IncidentService();
-
-    let twiml;
+    let twiml = new MessagingResponse();
 
     if (hasLocation && !isNaN(latitude) && !isNaN(longitude)) {
       console.log('Processing location share for phone:', reporterPhone);
@@ -56,10 +77,8 @@ app.post('/whatsapp', async (req, res) => {
           location: { type: 'Point', coordinates: [longitude, latitude] }
         });
         console.log('Updated location for existing incident:', openIncident._id);
-        twiml = new MessagingResponse();
         twiml.message('Location updated for your incident report!');
       } else {
-        // Create incident with location if no open one
         const { incident: savedIncident, isNew } = await incidentService.createIncident({
           description: body.trim() || 'User shared location without prior description',
           reporterPhone,
@@ -67,8 +86,7 @@ app.post('/whatsapp', async (req, res) => {
           location: { type: 'Point', coordinates: [longitude, latitude] }
         });
         console.log('Created new incident with location for phone:', reporterPhone);
-        twiml = new MessagingResponse();
-        twiml.message(`Thanks for sharing your location! ${isNew ? 'An incident has been created (ID: ${savedIncident._id}).' : 'Added to existing incident (ID: ${savedIncident._id}).'} Please send a description for more details.`);
+        twiml.message(`Thanks for sharing your location! ${isNew ? 'An incident has been created (ID: ' + savedIncident._id + ').' : 'Added to existing incident (ID: ' + savedIncident._id + ').'} Please send a description for more details.`);
       }
     } else if (body.trim()) {
       console.log('Processing text message for phone:', reporterPhone);
@@ -78,20 +96,16 @@ app.post('/whatsapp', async (req, res) => {
         category: 'other',
         location: { type: 'Point', coordinates: [0, 0] }
       });
-      twiml = new MessagingResponse();
       twiml.message(isNew ? `Incident reported and saved (ID: ${savedIncident._id})! To add your location, tap the attachment icon and select "Location".` : `Your report added to existing incident (ID: ${savedIncident._id})! To add location, tap the attachment icon.`);
     } else {
-      twiml = new MessagingResponse();
       twiml.message('Hello! To report an incident, send a description of the problem. You can also share your location anytime.');
     }
 
     res.type('text/xml').send(twiml.toString());
   } catch (error) {
     console.error('Error processing WhatsApp incident:', error);
-
     const twiml = new MessagingResponse();
     twiml.message('Sorry, there was an error processing your message. Please try again.');
-
     res.type('text/xml').send(twiml.toString());
   }
 });
@@ -100,5 +114,8 @@ app.post('/whatsapp', async (req, res) => {
 app.use((req, res) => {
   res.status(404).json({ success: false, message: 'Route not found' });
 });
+
+// Global error handler (must be last)
+app.use(errorHandler);
 
 module.exports = app;

@@ -68,7 +68,7 @@ class UserService {
       address: userData.address,
       location,
       role: userData.role || 'Guardian',
-      password: await bcrypt.hash(userData.password, 12)
+      password: await bcrypt.hash(userData.password, parseInt(process.env.BCRYPT_ROUNDS) || 12)
       // createdAt defaults to Date.now
     });
 

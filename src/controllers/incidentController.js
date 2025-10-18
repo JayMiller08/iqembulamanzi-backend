@@ -1,6 +1,8 @@
 
 const twilio = require('twilio');
 const IncidentService = require('../services/incidentService');
+const NotificationService = require('../services/notificationService');
+const Incident = require('../models/Incident');
 const incidentService = new IncidentService();
 
 const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);

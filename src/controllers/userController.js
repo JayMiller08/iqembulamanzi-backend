@@ -62,7 +62,7 @@ exports.loginUser = async (req, res) => {
     }
     const token = jwt.sign(
       { userId: user._id, email: user.email, role: user.role },
-      'secret_key',
+      process.env.JWT_SECRET || 'fallback_secret_key',
       { expiresIn: '24h' }
     );
     console.log('Login successful with status 200 for email:', req.body.email); // Log successful login

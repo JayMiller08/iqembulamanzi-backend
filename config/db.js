@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-const connectDB = async () => {
+const connectDB = async (app) => {
   const mongoURI = process.env.MONGODB_URI || 'mongodb+srv://system:123@cluster0.3f6xqzx.mongodb.net/SewerManagerDB?retryWrites=true&w=majority';
   console.log('Attempting connection to MongoDB URI:', mongoURI.replace(/\/\/.*@/, '//***:***@'));
   try {
