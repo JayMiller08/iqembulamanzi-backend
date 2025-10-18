@@ -9,7 +9,14 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "lint": "eslint .",
-    "lint:fix": "eslint . --fix"
+    "lint:fix": "eslint . --fix",
+    "db:setup": "node scripts/db-setup.js --init",
+    "db:test": "node scripts/db-test.js",
+    "db:setup-test": "node scripts/db-setup-test.js",
+    "integration-test": "node scripts/integration-test.js",
+    "db:backup": "node scripts/db-backup.js --backup",
+    "db:restore": "node scripts/db-backup.js --restore",
+    "db:list": "node scripts/db-backup.js --list"
   },
   "author": "MzWandile",
   "license": "ISC",

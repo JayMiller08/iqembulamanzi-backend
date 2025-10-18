@@ -1,7 +1,12 @@
 const Incident = require('../models/Incident');
 const twilio = require('twilio');
 
-const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+// Initialize Twilio client only if credentials are available
+let client = null;
+if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && 
+    process.env.TWILIO_ACCOUNT_SID !== 'test' && process.env.TWILIO_AUTH_TOKEN !== 'test') {
+  client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+}
 
 class NotificationService {
   async notifyReporters(incidentId, customMessage = null) {
@@ -28,12 +33,16 @@ class NotificationService {
         const message = customMessage || `Update for incident ${incident._id}: Status is now ${incident.status}.`;
 
         try {
-          await client.messages.create({
-            body: message,
-            from: fromNumber,
-            to: toNumber
-          });
-          console.log(`Notification sent to ${phone} for incident ${incidentId}`);
+          if (client) {
+            await client.messages.create({
+              body: message,
+              from: fromNumber,
+              to: toNumber
+            });
+            console.log(`Notification sent to ${phone} for incident ${incidentId}`);
+          } else {
+            console.log(`Twilio not configured - would send notification to ${phone} for incident ${incidentId}`);
+          }
         } catch (notifyError) {
           console.error(`Failed to send to ${phone}:`, notifyError.message);
           // Optional: Retry logic or log for manual send

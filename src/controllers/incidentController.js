@@ -5,7 +5,12 @@ const NotificationService = require('../services/notificationService');
 const Incident = require('../models/Incident');
 const incidentService = new IncidentService();
 
-const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+// Initialize Twilio client only if credentials are available
+let client = null;
+if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && 
+    process.env.TWILIO_ACCOUNT_SID !== 'test' && process.env.TWILIO_AUTH_TOKEN !== 'test') {
+  client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+}
 
 // Handle WhatsApp webhook
 const handleWebhook = async (req, res) => {

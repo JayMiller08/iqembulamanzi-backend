@@ -2,7 +2,12 @@ const Incident = require('../models/Incident');
 const User = require('../models/User');
 const twilio = require('twilio');
 
-const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+// Initialize Twilio client only if credentials are available
+let client = null;
+if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && 
+    process.env.TWILIO_ACCOUNT_SID !== 'test' && process.env.TWILIO_AUTH_TOKEN !== 'test') {
+  client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+}
 
 class IncidentService {
   async findMatchingIncident(location, description) {
@@ -89,7 +94,7 @@ class IncidentService {
         console.log('Guardian assigned and saved:', guardian.userId);
 
         // Send notification to assigned guardian
-        if (guardian.phone) {
+        if (guardian.phone && client) {
           try {
             const message = `New incident reported (ID: ${incident._id}): ${incident.description}. Priority: ${incident.priority}. Location: lat ${incident.location.coordinates[1]}, lng ${incident.location.coordinates[0]}. Please go verify the incident.`;
             await client.messages.create({
@@ -101,6 +106,8 @@ class IncidentService {
           } catch (notifyError) {
             console.error('Error sending notification to guardian:', notifyError.message);
           }
+        } else if (guardian.phone && !client) {
+          console.log(`Twilio not configured - would send notification to guardian ${guardian.userId}`);
         }
       } else if (guardian) {
         console.log('Guardian already assigned, no change');
